@@ -269,7 +269,7 @@
         timeDisplay.innerText = '(Updating...)';
 
         try {
-            const response = await fetch('https://stocks-tracking.onrender.com', {
+            const response = await fetch('https://stocks-tracking.onrender.com/api/stocks', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ tickers: watchList })
@@ -480,3 +480,4 @@
 </body>
 
 </html>
+
