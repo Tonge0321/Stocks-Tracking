@@ -206,6 +206,12 @@
     let watchList = ['0050.TW', 'VRT', 'SOFI', 'S', 'RCAT', 'ONDS', 'NVDA', 'SMR', 'NKE', 'EOSE', 'CRWV']; 
     let chartInstances = {};
 
+    // 判斷 API 網址：如果在本地開發 (localhost 或 127.0.0.1)，就連本地後端；否則連 Render 線上版
+    // 這樣你改了 app.py 在本地測試時，前端會抓到正確的資料
+    const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'http://127.0.0.1:5000/api/stocks'
+        : 'https://stocks-tracking.onrender.com/api/stocks';
+
     Chart.register({
         id: 'verticalLine',
         afterDraw: (chart) => {
@@ -292,8 +298,8 @@
         timeDisplay.innerText = '(Updating...)';
 
         try {
-            // ✅ 這裡我已經幫您填入正確的 Render 網址了
-            const response = await fetch('https://stocks-tracking.onrender.com/api/stocks', {
+            // 使用動態判斷的網址
+            const response = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ tickers: watchList })
@@ -310,7 +316,7 @@
 
         } catch (error) {
             console.error('Fetch error:', error);
-            timeDisplay.innerText = '(Error - Check Render Status)';
+            timeDisplay.innerText = '(Error - Check Network/Render)';
         }
     }
 
@@ -341,6 +347,7 @@
         document.getElementById(`high-${ticker}`).innerText = `H:${data.high}`;
         document.getElementById(`bidask-${ticker}`).innerHTML = `B:<span>${data.futBid}</span> / A:<span>${data.futAsk}</span>`;
         
+        // 這裡會顯示從後端 NAME_CACHE 傳來的正確全名
         document.getElementById(`name-${ticker}`).innerText = data.name;
 
         let rangePct = 50;
