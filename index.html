@@ -3,247 +3,299 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Dashboard 2026</title>
+    <title>Stock Command Center</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <style>
-        /* --- 全局深色主題設定 (還原截圖風格) --- */
+        /* --- 全局設定 --- */
         body {
-            background-color: #0d1117; /* GitHub Dark Dimmed 背景色 */
-            color: #c9d1d9;            /* 柔和白字 */
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 20px;
+            overflow-y: scroll; /* 防止滾動條跳動 */
         }
 
-        /* --- 頂部標題與更新時間 --- */
+        /* --- 頂部控制列 --- */
         .header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-end; /* 對齊底部 */
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #30363d; /* 分隔線 */
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #30363d;
         }
-        h1 { margin: 0; font-size: 24px; color: #f0f6fc; }
-        .last-updated { font-size: 14px; color: #8b949e; }
+        h1 { margin: 0; font-size: 24px; color: #f0f6fc; display: flex; align-items: center; gap: 10px; }
+        .controls { display: flex; gap: 10px; }
+        
+        /* 按鈕樣式 */
+        .btn {
+            border: 1px solid rgba(240, 246, 252, 0.1);
+            border-radius: 6px;
+            padding: 6px 14px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn-add { background: #238636; color: white; border: none; }
+        .btn-add:hover { background: #2ea043; }
+        .btn-refresh { background: #21262d; color: #c9d1d9; }
+        .btn-refresh:hover { background: #30363d; border-color: #8b949e; }
 
-        /* --- 格狀佈局 (Grid) --- */
+        /* --- Grid 佈局 --- */
         .grid-container {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); /* 自適應寬度 */
-            gap: 20px; /* 卡片間距 */
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
         }
 
-        /* --- 股票卡片樣式 --- */
+        /* --- 卡片樣式 --- */
         .stock-card {
-            background-color: #161b22; /* 卡片深灰底色 */
-            border: 1px solid #30363d; /* 邊框 */
-            border-radius: 6px;        /* 圓角 */
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            transition: transform 0.2s, border-color 0.2s;
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 15px;
+            position: relative; /* 為了定位刪除按鈕 */
+            cursor: grab; /* 提示可拖曳 */
+            transition: transform 0.2s, box-shadow 0.2s;
         }
-        .stock-card:hover {
-            border-color: #58a6ff; /* 滑鼠移過變藍框 */
-            transform: translateY(-2px);
-        }
+        .stock-card:active { cursor: grabbing; }
+        .stock-card:hover { border-color: #58a6ff; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
 
-        /* --- 卡片內部排版 --- */
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-        .symbol {
-            font-size: 20px;
-            font-weight: 600;
-            color: #58a6ff; /* 股票代碼藍色 */
-        }
-        
-        /* 漲跌幅標籤 (還原截圖中的圓角矩形) */
-        .change-badge {
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 14px;
-            font-weight: 600;
-        }
-        .up { color: #3fb950; background-color: rgba(63, 185, 80, 0.15); border: 1px solid rgba(63, 185, 80, 0.4); }   /* 綠漲 */
-        .down { color: #f85149; background-color: rgba(248, 81, 73, 0.15); border: 1px solid rgba(248, 81, 73, 0.4); } /* 紅跌 */
-        .neutral { color: #8b949e; background-color: rgba(110, 118, 129, 0.15); }
-
-        /* 主價格 */
-        .main-price {
-            font-size: 32px;
-            font-weight: 700;
-            color: #f0f6fc;
-            margin-bottom: 15px;
-            letter-spacing: 0.5px;
-        }
-
-        /* 詳細資訊區 (最高、最低、期貨) */
-        .details-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            padding-top: 12px;
-            border-top: 1px solid #30363d;
-            font-size: 13px;
-            color: #8b949e;
-        }
-        .detail-item {
-            display: flex;
-            flex-direction: column;
-        }
-        .detail-label { font-size: 12px; margin-bottom: 2px; }
-        .detail-value { color: #c9d1d9; font-family: monospace; font-size: 14px; }
-
-        /* --- 圖表容器 --- */
-        .chart-box {
-            height: 150px;
-            margin-top: 15px;
-            border-radius: 4px;
-            overflow: hidden; /* 防止圖表溢出圓角 */
-        }
-
-        /* 錯誤與載入訊息 */
-        .status-msg { grid-column: 1/-1; text-align: center; color: #8b949e; margin-top: 50px; }
-        
-        /* 重新整理按鈕 */
-        #refresh-btn {
-            background-color: #238636;
+        /* 刪除按鈕 (預設隱藏，hover時顯示) */
+        .delete-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #f85149;
             color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 6px;
-            cursor: pointer;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 24px;
+            font-weight: bold;
             font-size: 14px;
-            font-weight: 600;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 10;
         }
-        #refresh-btn:hover { background-color: #2ea043; }
+        .stock-card:hover .delete-btn { opacity: 1; }
+
+        /* 卡片內容 */
+        .card-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; }
+        .symbol { font-size: 20px; font-weight: 700; color: #58a6ff; }
+        
+        .change-badge { padding: 2px 8px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+        .up { color: #3fb950; background: rgba(63, 185, 80, 0.15); border: 1px solid rgba(63, 185, 80, 0.4); }
+        .down { color: #f85149; background: rgba(248, 81, 73, 0.15); border: 1px solid rgba(248, 81, 73, 0.4); }
+        .neutral { color: #8b949e; background: rgba(110, 118, 129, 0.15); }
+
+        .price { font-size: 32px; font-weight: 700; color: #f0f6fc; margin: 10px 0; }
+
+        .info-row { display: flex; justify-content: space-between; font-size: 12px; color: #8b949e; border-top: 1px solid #30363d; padding-top: 8px; margin-top: 8px; }
+        .info-val { color: #c9d1d9; font-family: monospace; }
+
+        /* 圖表區 */
+        .chart-box { height: 160px; margin-top: 15px; border-radius: 4px; overflow: hidden; }
+
+        /* 載入遮罩 */
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(13, 17, 23, 0.8);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000; color: #58a6ff; font-size: 1.5em; font-weight: bold;
+            display: none; /* 預設隱藏 */
+        }
     </style>
 </head>
 <body>
 
+    <div id="overlay">Processing...</div>
+
     <div class="header">
-        <div>
-            <h1>Market Watch</h1>
-            <div id="last-updated" class="last-updated">Initializing...</div>
+        <h1>Market Watch</h1>
+        <div class="controls">
+            <button class="btn btn-add" onclick="addNewStock()">+ Add Stock</button>
+            <button class="btn btn-refresh" onclick="loadData()">↻ Refresh</button>
         </div>
-        <button id="refresh-btn" onclick="initDashboard()">Refresh</button>
     </div>
 
-    <div id="container" class="grid-container">
-        <div class="status-msg">Loading data...</div>
-    </div>
+    <div id="dashboard" class="grid-container">
+        </div>
 
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
 
     <script>
-        // ★★★ 您的 Apps Script 網址 (請確認結尾是 /exec) ★★★
         const API_URL = "https://script.google.com/macros/s/AKfycbwbZ-6VDAPGy6j3GOV64WAdgR5JSPZaYpXqoDr7Y5iLCoCOUYF10RNtywY52gntnsWp/exec";
+        let currentData = [];
 
-        async function initDashboard() {
-            const container = document.getElementById('container');
-            const timeLabel = document.getElementById('last-updated');
-            const btn = document.getElementById('refresh-btn');
-            
-            btn.textContent = 'Loading...';
-            btn.disabled = true;
-
+        // 1. 初始化與載入資料
+        async function loadData() {
+            showLoading(true);
             try {
-                // 加 timestamp 防止快取
                 const res = await fetch(`${API_URL}?t=${Date.now()}`);
                 const data = await res.json();
-                
-                if (!data || data.length === 0) {
-                    container.innerHTML = '<div class="status-msg">No Data Received from Sheet</div>';
-                    return;
-                }
-
-                container.innerHTML = ''; // 清空載入訊息
-
-                data.forEach((stock, idx) => {
-                    // 過濾掉系統測試用的資料
-                    if (stock.symbol === 'SYSTEM_OK' || stock.symbol === 'TEST') return;
-
-                    // 處理漲跌顏色邏輯
-                    let pctText = stock.changePercent || "0%";
-                    let type = 'neutral';
-                    if (pctText.includes('-')) type = 'down';
-                    else if (pctText !== "0%" && pctText !== "0.00%") {
-                        type = 'up';
-                        if (!pctText.includes('+')) pctText = '+' + pctText; // 補上正號
-                    }
-
-                    // 建立卡片元素
-                    const card = document.createElement('div');
-                    card.className = 'stock-card';
-                    const chartId = `chart_${idx}`; // 獨立圖表 ID
-
-                    card.innerHTML = `
-                        <div class="card-header">
-                            <span class="symbol">${stock.symbol}</span>
-                            <span class="change-badge ${type}">${pctText}</span>
-                        </div>
-                        
-                        <div class="main-price">${stock.price}</div>
-                        
-                        <div class="details-grid">
-                            <div class="detail-item">
-                                <span class="detail-label">Day High</span>
-                                <span class="detail-value">${stock.high || '-'}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Day Low</span>
-                                <span class="detail-value">${stock.low || '-'}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Futures / AH</span>
-                                <span class="detail-value">${stock.futuresPrice || '-'}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Updated</span>
-                                <span class="detail-value">${stock.timestamp}</span>
-                            </div>
-                        </div>
-
-                        <div id="${chartId}" class="chart-box"></div>
-                    `;
-                    container.appendChild(card);
-
-                    // 嵌入 TradingView 小圖表 (Mini Chart)
-                    new TradingView.widget({
-                        "autosize": true,
-                        "symbol": stock.symbol,
-                        "interval": "D",
-                        "timezone": "Asia/Taipei",
-                        "theme": "dark",
-                        "style": "3", // 3 = 面積圖 (Area), 比較像截圖的風格
-                        "locale": "en",
-                        "toolbar_bg": "#f1f3f6",
-                        "enable_publishing": false,
-                        "hide_top_toolbar": true,
-                        "hide_legend": true,
-                        "save_image": false,
-                        "container_id": chartId,
-                        "isTransparent": true // 讓圖表背景透明，融入卡片色
-                    });
-                });
-                
-                timeLabel.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
-
-            } catch (err) {
-                console.error(err);
-                container.innerHTML = `<div class="status-msg" style="color: #f85149;">Connection Error: ${err.message}</div>`;
+                currentData = data;
+                renderCards(data);
+            } catch (e) {
+                alert("Load failed: " + e.message);
             } finally {
-                btn.textContent = 'Refresh';
-                btn.disabled = false;
+                showLoading(false);
             }
         }
 
-        // 頁面載入後自動執行
-        window.onload = initDashboard;
+        // 2. 渲染卡片
+        function renderCards(data) {
+            const container = document.getElementById('dashboard');
+            container.innerHTML = "";
+
+            if (!data || data.length === 0) {
+                container.innerHTML = "<div style='color:#8b949e'>No stocks found. Click '+ Add Stock' to begin.</div>";
+                return;
+            }
+
+            data.forEach((stock, index) => {
+                const card = document.createElement('div');
+                card.className = 'stock-card';
+                card.dataset.symbol = stock.symbol; // 用於排序識別
+
+                // 顏色邏輯
+                let pct = stock.changePercent || "0%";
+                let type = 'neutral';
+                if(pct.includes('-')) type = 'down';
+                else if(pct !== "0%" && pct !== "New") type = 'up';
+
+                const chartId = `chart_${index}_${stock.symbol}`;
+
+                card.innerHTML = `
+                    <div class="delete-btn" onclick="deleteStock('${stock.symbol}')" title="Delete">×</div>
+                    <div class="card-top">
+                        <span class="symbol">${stock.symbol}</span>
+                        <span class="change-badge ${type}">${pct}</span>
+                    </div>
+                    <div class="price">${stock.price}</div>
+                    <div class="info-row">
+                        <span>Futures / AH</span>
+                        <span class="info-val">${stock.futuresPrice || '-'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span>Updated</span>
+                        <span class="info-val">${stock.timestamp}</span>
+                    </div>
+                    <div id="${chartId}" class="chart-box"></div>
+                `;
+
+                container.appendChild(card);
+
+                // 載入 TradingView
+                new TradingView.widget({
+                    "autosize": true,
+                    "symbol": stock.symbol,
+                    "interval": "D",
+                    "timezone": "Asia/Taipei",
+                    "theme": "dark",
+                    "style": "3", 
+                    "locale": "en",
+                    "toolbar_bg": "#f1f3f6",
+                    "enable_publishing": false,
+                    "hide_top_toolbar": true,
+                    "hide_legend": true,
+                    "save_image": false,
+                    "container_id": chartId,
+                    "isTransparent": true
+                });
+            });
+
+            // 啟用拖曳排序
+            setupSortable();
+        }
+
+        // 3. 啟用 SortableJS
+        function setupSortable() {
+            const el = document.getElementById('dashboard');
+            new Sortable(el, {
+                animation: 150,
+                ghostClass: 'blue-background-class',
+                onEnd: function (evt) {
+                    saveOrder(); // 拖曳結束後，自動儲存順序
+                }
+            });
+        }
+
+        // 4. 新增股票
+        async function addNewStock() {
+            const symbol = prompt("Enter Stock Symbol (e.g., NVDA, 0050.TW):");
+            if (!symbol) return;
+
+            showLoading(true, "Adding...");
+            try {
+                // 發送 POST 請求給 Apps Script
+                await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', // 關鍵：Apps Script 需要 no-cors 或 text/plain
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ action: "add", symbol: symbol })
+                });
+                
+                // 等待 1 秒讓後端處理
+                setTimeout(() => {
+                    loadData(); // 重新載入
+                }, 1500);
+            } catch (e) {
+                alert("Add failed: " + e.message);
+                showLoading(false);
+            }
+        }
+
+        // 5. 刪除股票
+        async function deleteStock(symbol) {
+            if (!confirm(`Remove ${symbol}?`)) return;
+
+            showLoading(true, "Deleting...");
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ action: "delete", symbol: symbol })
+                });
+                setTimeout(() => loadData(), 1500);
+            } catch (e) {
+                alert("Delete failed");
+                showLoading(false);
+            }
+        }
+
+        // 6. 儲存排序
+        async function saveOrder() {
+            // 抓取目前畫面上的順序
+            const cards = document.querySelectorAll('.stock-card');
+            const orderList = Array.from(cards).map(card => card.dataset.symbol);
+
+            console.log("Saving order:", orderList);
+
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ action: "reorder", orderList: orderList })
+                });
+            } catch (e) {
+                console.error("Order save failed", e);
+            }
+        }
+
+        function showLoading(show, text="Processing...") {
+            const el = document.getElementById('overlay');
+            el.innerText = text;
+            el.style.display = show ? 'flex' : 'none';
+        }
+
+        window.onload = loadData;
     </script>
 </body>
 </html>
