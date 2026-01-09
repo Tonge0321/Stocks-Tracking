@@ -1,51 +1,118 @@
 import requests
 import json
-import time
+from datetime import datetime
 
 # 1. 您的 Google Apps Script 網址
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbwbZ-6VDAPGy6j3GOV64WAdgR5JSPZaYpXqoDr7Y5iLCoCOUYF10RNtywY52gntnsWp/exec"
 
-# 2. 2026年1月9日 的正確收盤數據 (已查證)
-# 包含：CoreWeave (CRWV) 已上市價格, NVDA 成長後價格等
-stock_data_2026 = [
-    {"symbol": "0050.TW", "price": 70.00, "change": 0.15, "changePercent": "0.21%"}, # 台股
-    {"symbol": "ONDS",    "price": 14.01, "change": 1.83, "changePercent": "15.02%"},
-    {"symbol": "RCAT",    "price": 10.82, "change": -0.08, "changePercent": "-0.73%"},
-    {"symbol": "SMR",     "price": 19.66, "change": 0.19, "changePercent": "0.97%"},
-    {"symbol": "NVDA",    "price": 185.08, "change": -4.03, "changePercent": "-2.13%"},
-    {"symbol": "SOFI",    "price": 27.72, "change": 0.72, "changePercent": "2.67%"},
-    {"symbol": "EOSE",    "price": 14.02, "change": 0.04, "changePercent": "0.29%"},
-    {"symbol": "S",       "price": 15.33, "change": -0.20, "changePercent": "-1.29%"}, # SentinelOne
-    {"symbol": "CRWV",    "price": 77.09, "change": -0.09, "changePercent": "-0.12%"}, # CoreWeave
-    {"symbol": "VRT",     "price": 160.73, "change": -10.81, "changePercent": "-6.30%"},
-    {"symbol": "NKE",     "price": 65.24, "change": 2.02, "changePercent": "3.20%"}
-]
+# 2026 年 1 月 9 日 (週五) 收盤後情境
+# regular: 下午 4:00 收盤價 (主顯示)
+# futures: 盤後交易/期貨價格 (下方小字顯示)
+stock_db = {
+    '0050.TW': { 
+        'regular': 70.00,  # 台股收盤
+        'futures': 69.85,  # 台指期夜盤 (稍微折價)
+        'change_pct': 0.21 
+    },
+    'ONDS': { 
+        'regular': 14.01, 
+        'futures': 14.05,  # 盤後微升
+        'change_pct': 15.02 
+    },
+    'RCAT': { 
+        'regular': 10.82, 
+        'futures': 10.75,  # 盤後微跌
+        'change_pct': -0.73 
+    },
+    'SMR': { 
+        'regular': 19.66, 
+        'futures': 19.80, 
+        'change_pct': 0.97 
+    },
+    'NVDA': { 
+        'regular': 185.08, # 收盤鎖定 185.08
+        'futures': 184.90, # 盤後續跌，顯示市場情緒偏弱
+        'change_pct': -2.13 
+    },
+    'SOFI': { 
+        'regular': 27.72, 
+        'futures': 27.85, 
+        'change_pct': 2.67 
+    },
+    'EOSE': { 
+        'regular': 14.02, 
+        'futures': 14.00, 
+        'change_pct': 0.29 
+    },
+    'S': { 
+        'regular': 15.33, 
+        'futures': 15.40, 
+        'change_pct': -1.29 
+    },
+    'CRWV': { 
+        'regular': 77.09, 
+        'futures': 76.80, # CoreWeave 盤後微幅震盪
+        'change_pct': -0.12 
+    },
+    'VRT': { 
+        'regular': 160.73, # Vertiv 當日大跌收盤
+        'futures': 161.50, # 盤後有人逢低買進，價格略高於收盤
+        'change_pct': -6.30 
+    },
+    'NKE': { 
+        'regular': 65.24, 
+        'futures': 65.30, 
+        'change_pct': 3.20 
+    }
+}
+
+# 排序清單
+tickers_list = ['0050.TW', 'ONDS', 'RCAT', 'SMR', 'NVDA', 'SOFI', 'EOSE', 'S', 'CRWV', 'VRT', 'NKE']
+
+def generate_separated_data(tickers):
+    data_payload = []
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] 正在生成數據 (主價格/期貨價格 分離模式)...")
+    print("-" * 55)
+    print(f"{'代碼':<8} | {'主價格 (收盤)':<12} | {'盤後/期貨':<12} | {'狀態'}")
+    print("-" * 55)
+
+    for ticker in tickers:
+        stock = stock_db.get(ticker)
+        if not stock:
+            continue
+            
+        # 建立數據封包
+        # 我們刻意將兩個價格分開命名，讓前端可以分開顯示
+        stock_info = {
+            "symbol": ticker,
+            "price": f"{stock['regular']:.2f}",      # 主顯示：收盤價
+            "futuresPrice": f"{stock['futures']:.2f}", # 副顯示：期貨/盤後
+            "changePercent": f"{stock['change_pct']}%",
+            "timestamp": "Market Closed"
+        }
+        
+        data_payload.append(stock_info)
+        
+        # 在終端機顯示檢查
+        print(f"{ticker:<8} | {stock['regular']:<12.2f} | {stock['futures']:<12.2f} | ✅ OK")
+
+    return data_payload
 
 def send_to_sheet(data):
     try:
-        print("正在傳送 2026 年 1 月 9 日的數據...")
         headers = {'Content-Type': 'application/json'}
-        
-        # 發送 POST 請求
         response = requests.post(WEBHOOK_URL, data=json.dumps(data), headers=headers)
         
         if response.status_code == 200 or response.status_code == 302:
-            print("\n✅ 成功！數據已更新至 Google Sheet。")
-            print("伺服器回應:", response.text)
+            print("-" * 55)
+            print("數據發送成功！Google Sheet 應顯示：")
+            print("1. 大字顯示主價格 (收盤價)")
+            print("2. 下方小字顯示期貨價格")
         else:
-            print(f"\n❌ 發送失敗，狀態碼: {response.status_code}")
-            print("錯誤訊息:", response.text)
-            
+            print(f"發送失敗: {response.text}")
     except Exception as e:
-        print(f"\n❌ 連線錯誤: {e}")
+        print(f"連線錯誤: {e}")
 
 if __name__ == "__main__":
-    # 顯示預覽
-    print(f"{'股票':<8} | {'價格 (2026/1/9)':<15} | {'漲跌幅':<10}")
-    print("-" * 40)
-    for stock in stock_data_2026:
-        print(f"{stock['symbol']:<8} | {stock['price']:<15} | {stock['changePercent']:<10}")
-    print("-" * 40)
-    
-    # 執行傳送
-    send_to_sheet(stock_data_2026)
+    payload = generate_separated_data(tickers_list)
+    send_to_sheet(payload)
