@@ -297,7 +297,7 @@
 
         try {
             // 請確保這裡填入的是您 Render 的網址
-            const response = await fetch('https://your-render-url.onrender.com/api/stocks', {
+            const response = await fetch('https://stocks-tracking.onrender.com', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ tickers: watchList })
@@ -464,3 +464,4 @@
 
 </body>
 </html>
+
