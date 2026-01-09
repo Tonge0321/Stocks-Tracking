@@ -98,7 +98,9 @@ def generate_separated_data(tickers):
 
     return data_payload
 
-def send_to_sheet(data):
+def send_to_sheet(data):    
+    print(f"準備發送 {len(data)} 筆資料...") # <--- 加入這行檢查
+    # ... 其餘程式碼
     try:
         headers = {'Content-Type': 'application/json'}
         response = requests.post(WEBHOOK_URL, data=json.dumps(data), headers=headers)
@@ -116,3 +118,4 @@ def send_to_sheet(data):
 if __name__ == "__main__":
     payload = generate_separated_data(tickers_list)
     send_to_sheet(payload)
+
