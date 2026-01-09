@@ -1,469 +1,230 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocks Tracking Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Stock Dashboard 2026</title>
     <style>
-        :root {
-            --bg-color: #121212;
-            --card-bg: #1e1e1e;
-            --text-main: #ffffff;
-            --text-sub: #9aa0a6;
-            --text-tertiary: #5f6368;
-            --up-color: #00d25b;
-            --down-color: #fc424a;
-            --accent: #3d7bf8;
-            --danger: #ff4444;
-        }
-
+        /* 暗黑模式樣式設定 */
         body {
-            font-family: 'Google Sans', Roboto, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
+            background-color: #0d1117; /* 深色背景 */
+            color: #c9d1d9; /* 淺色文字 */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 20px;
         }
-
-        header {
+        
+        .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #30363d;
         }
         
-        h1 { margin: 0; font-size: 1.5rem; font-weight: 400; }
-        .last-update { font-size: 0.8rem; color: var(--text-tertiary); margin-left: 10px; }
+        h1 { margin: 0; font-size: 24px; color: #f0f6fc; }
+        .last-updated { font-size: 0.9em; color: #8b949e; margin-top: 5px; }
+        
+        /* 卡片網格佈局 */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 20px;
+        }
+        
+        /* 單張股票卡片 */
+        .stock-card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s;
+        }
+        
+        .stock-card:hover {
+            transform: translateY(-2px);
+            border-color: #58a6ff;
+        }
+        
+        .stock-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 12px;
+        }
+        
+        .symbol {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #58a6ff; /* 藍色代碼 */
+        }
+        
+        .price-container {
+            margin-bottom: 12px;
+        }
+        
+        .main-price {
+            font-size: 2.2em;
+            font-weight: bold;
+            color: #f0f6fc;
+        }
+        
+        /* 漲跌幅顏色 */
+        .change {
+            font-size: 1.1em;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .change.positive { color: #3fb950; background-color: rgba(63, 185, 80, 0.1); } /* 綠色 */
+        .change.negative { color: #f85149; background-color: rgba(248, 81, 73, 0.1); } /* 紅色 */
+        
+        /* 期貨/盤後價格 */
+        .futures-row {
+            margin-top: auto;
+            padding-top: 12px;
+            border-top: 1px solid #30363d;
+            font-size: 0.9em;
+            color: #8b949e;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .futures-val {
+            color: #c9d1d9;
+            font-family: monospace;
+            font-size: 1.1em;
+        }
 
-        .btn {
-            background-color: var(--accent);
+        /* 狀態訊息 */
+        .loading { text-align: center; margin-top: 50px; font-size: 1.2em; color: #8b949e; }
+        .error { color: #f85149; text-align: center; margin-top: 20px; padding: 20px; border: 1px solid #f85149; border-radius: 6px; }
+        
+        button#refresh-btn {
+            background-color: #238636;
             color: white;
             border: none;
             padding: 8px 16px;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 0.9rem;
-            transition: opacity 0.2s;
+            font-weight: 600;
+            font-size: 14px;
         }
-        .btn:hover { opacity: 0.9; }
-        .btn-refresh { background-color: #333; margin-right: 10px; }
-
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-            gap: 20px;
-        }
-
-        /* Stock Card */
-        .stock-card {
-            background-color: var(--card-bg);
-            border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            border: 1px solid #333;
-            position: relative;
-            cursor: grab;
-            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
-            min-height: 250px;
-        }
-        
-        .stock-card:active { cursor: grabbing; }
-        .stock-card:hover {
-            border-color: #555;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
-        }
-        .stock-card.dragging {
-            opacity: 0.5;
-            border: 2px dashed var(--accent);
-            background: #252525;
-        }
-
-        .loading-overlay {
-            position: absolute; top:0; left:0; width:100%; height:100%;
-            background: rgba(30,30,30,0.8);
-            display: flex; justify-content: center; align-items: center;
-            border-radius: 12px; z-index: 5;
-            color: #aaa; font-size: 0.9rem;
-        }
-        .hidden { display: none; }
-
-        .delete-btn {
-            position: absolute; top: 10px; right: 10px;
-            background: none; border: none; color: #444;
-            font-size: 1.5rem; line-height: 1; cursor: pointer;
-            padding: 0 5px; z-index: 10; transition: color 0.2s;
-        }
-        .delete-btn:hover { color: var(--danger); }
-
-        /* Header Layout: Ticker + Name */
-        .card-header {
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            padding-right: 20px;
-        }
-
-        .ticker-name-group {
-            display: flex;
-            align-items: center;
-            flex: 1; 
-            min-width: 0; 
-            padding-right: 10px;
-        }
-
-        .ticker { 
-            font-size: 1.4rem; 
-            font-weight: 500; 
-            flex-shrink: 0;
-        }
-
-        .comp-name { 
-            font-size: 0.75rem; 
-            color: var(--text-sub); 
-            margin-left: 8px; 
-            display: -webkit-box;
-            -webkit-line-clamp: 2; 
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            white-space: normal; 
-            line-height: 1.1;
-        }
-
-        .open-label { 
-            font-size: 0.75rem; 
-            color: var(--text-sub);
-            flex-shrink: 0; 
-            white-space: nowrap; 
-            text-align: right;
-        }
-
-        .data-row { display: flex; justify-content: space-between; align-items: flex-end; }
-        
-        .left-col { display: flex; flex-direction: column; justify-content: flex-end; }
-        .current-price { font-size: 2.2rem; font-weight: 500; line-height: 1; margin-bottom: 8px; letter-spacing: -1px; }
-        
-        .futures-row { font-size: 0.75rem; color: var(--text-sub); display: flex; gap: 8px; align-items: center; }
-        .fut-tag { background: #3c4043; color: #e8eaed; padding: 2px 4px; border-radius: 4px; font-size: 0.65rem; font-weight: 600; }
-        .bid-ask { font-family: 'Roboto Mono', monospace; color: var(--text-sub); }
-
-        .right-col { display: flex; flex-direction: column; align-items: flex-end; width: 45%; }
-        .change-group { text-align: right; margin-bottom: 8px; }
-        .change-val { font-size: 1.2rem; font-weight: 500; }
-        .change-pct { font-size: 0.9rem; }
-
-        .range-container { width: 50%; margin-left: auto; padding-top: 4px; }
-        .range-track { position: relative; height: 1px; background: #5f6368; width: 100%; margin: 6px 0; }
-        .range-diamond { width: 6px; height: 6px; background: var(--text-main); transform: rotate(45deg); position: absolute; top: -2.5px; box-shadow: 0 0 2px rgba(255,255,255,0.8); transition: left 0.5s ease; }
-        .range-labels { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--text-sub); font-family: 'Roboto Mono', monospace; }
-
-        .chart-wrapper { height: 140px; width: 100%; margin-top: 10px; position: relative; }
-
-        .text-up { color: var(--up-color); }
-        .text-down { color: var(--down-color); }
-
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7); display: none;
-            justify-content: center; align-items: center; z-index: 1000;
-        }
-        .modal { background: var(--card-bg); padding: 24px; border-radius: 12px; width: 320px; border: 1px solid #333; }
-        .modal input { width: 100%; padding: 10px; margin: 15px 0; background: #121212; border: 1px solid #333; color: white; border-radius: 4px; box-sizing: border-box; }
-        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
-        .btn-cancel { background: #333; }
+        button#refresh-btn:hover { background-color: #2ea043; }
+        button#refresh-btn:disabled { background-color: #30363d; cursor: not-allowed; }
     </style>
 </head>
 <body>
 
-<header>
-    <div>
-        <h1>Stocks Tracking <span id="updateTime" class="last-update"></span></h1>
-    </div>
-    <div>
-        <button class="btn btn-refresh" onclick="fetchData()">⟳ Refresh</button>
-        <button class="btn" onclick="openModal()">+ Add Stock</button>
-    </div>
-</header>
-
-<div class="dashboard-grid" id="dashboard"></div>
-
-<div class="modal-overlay" id="addModal">
-    <div class="modal">
-        <h3>Add New Ticker</h3>
-        <input type="text" id="newTicker" placeholder="e.g., AMD, TSLA" style="text-transform: uppercase;">
-        <div class="modal-actions">
-            <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
-            <button class="btn" onclick="addStock()">Add</button>
+    <div class="header">
+        <div>
+            <h1>Stocks Tracker</h1>
+            <div id="last-updated" class="last-updated">Waiting for data...</div>
         </div>
+        <button id="refresh-btn" onclick="updateDashboard()">Refresh</button>
     </div>
-</div>
 
-<script>
-    let watchList = ['0050.TW', 'ONDS','RCAT', 'SMR', 'NVDA',  'SOFI', 'EOSE', 'S', 'CRWV', 'VRT', 'NKE']; 
-    let chartInstances = {};
+    <div id="stock-container" class="grid-container">
+        <div class="loading">Loading market data from Google Sheet...</div>
+    </div>
 
-    // 判斷 API 網址：如果在本地開發 (localhost 或 127.0.0.1)，就連本地後端；否則連 Render 線上版
-    // 這樣你改了 app.py 在本地測試時，前端會抓到正確的資料
-    const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'http://127.0.0.1:5000/api/stocks'
-        : 'https://stocks-tracking.onrender.com/api/stocks';
+    <script>
+        // ★★★ 這是您的 Google Apps Script 網址 ★★★
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbwbZ-6VDAPGy6j3GOV64WAdgR5JSPZaYpXqoDr7Y5iLCoCOUYF10RNtywY52gntnsWp/exec";
 
-    Chart.register({
-        id: 'verticalLine',
-        afterDraw: (chart) => {
-            if (chart.tooltip?._active?.length) {
-                const ctx = chart.ctx;
-                const x = chart.tooltip._active[0].element.x;
-                const topY = chart.scales.y.top;
-                const bottomY = chart.scales.y.bottom;
-                ctx.save();
-                ctx.beginPath(); ctx.moveTo(x, topY); ctx.lineTo(x, bottomY);
-                ctx.lineWidth = 1; ctx.strokeStyle = '#888'; ctx.setLineDash([3, 3]);
-                ctx.stroke(); ctx.restore();
+        // 從 Google Apps Script 抓取資料
+        async function fetchStockData() {
+            try {
+                // 加一個 timestamp 參數防止瀏覽器快取舊資料
+                const url = `${GAS_URL}?t=${new Date().getTime()}`;
+                const response = await fetch(url);
+                
+                if (!response.ok) throw new Error('Network response was not ok');
+                
+                const data = await response.json();
+                return data; 
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                throw error;
             }
         }
-    });
 
-    const dashboard = document.getElementById('dashboard');
+        // 渲染畫面
+        function renderStocks(stocks) {
+            const container = document.getElementById('stock-container');
+            container.innerHTML = ''; // 清空載入中訊息
 
-    function initDashboard() {
-        dashboard.innerHTML = '';
-        watchList.forEach((ticker, index) => {
-            createCardSkeleton(ticker, index);
-        });
-        fetchData();
-    }
+            if (!stocks || stocks.length === 0) {
+                container.innerHTML = '<div class="error">No data received. Please check your Google Sheet or Script.</div>';
+                return;
+            }
 
-    function createCardSkeleton(ticker, index) {
-        const card = document.createElement('div');
-        card.className = 'stock-card';
-        card.draggable = true;
-        card.id = `card-${ticker}`;
-        card.dataset.ticker = ticker;
-        card.dataset.index = index;
+            stocks.forEach(stock => {
+                // 處理漲跌幅顏色與正負號
+                let changeText = stock.changePercent || "0.00%";
+                const isNegative = changeText.includes('-');
+                const changeClass = isNegative ? 'negative' : 'positive';
+                
+                // 如果是正數且沒有+號，手動補上 (美觀用)
+                if (!isNegative && !changeText.includes('+') && changeText !== "0.00%") {
+                    changeText = '+' + changeText;
+                }
 
-        card.innerHTML = `
-            <div class="loading-overlay" id="loading-${ticker}">Loading...</div>
-            <button class="delete-btn" onclick="removeStock('${ticker}')">&times;</button>
-            
-            <div class="card-header">
-                <div class="ticker-name-group">
-                    <span class="ticker">${ticker.replace('.TW', '')}</span>
-                    <span class="comp-name" id="name-${ticker}">...</span>
-                </div>
-                <span class="open-label" id="open-${ticker}">Prev: --</span>
-            </div>
-
-            <div class="data-row">
-                <div class="left-col">
-                    <div class="current-price" id="price-${ticker}">--</div>
+                // 建立卡片 HTML
+                const card = document.createElement('div');
+                card.className = 'stock-card';
+                
+                card.innerHTML = `
+                    <div class="stock-header">
+                        <div class="symbol">${stock.symbol}</div>
+                        <div class="change ${changeClass}">${changeText}</div>
+                    </div>
+                    <div class="price-container">
+                        <div class="main-price">${stock.price}</div>
+                    </div>
                     <div class="futures-row">
-                        <span class="fut-tag">FUT</span>
-                        <div class="bid-ask" id="bidask-${ticker}">B:-- / A:--</div>
+                        <span>Fut / After-hours</span>
+                        <span class="futures-val">${stock.futuresPrice}</span>
                     </div>
-                </div>
-
-                <div class="right-col">
-                    <div class="change-group">
-                        <div class="change-val" id="change-${ticker}">--</div>
-                        <div class="change-pct" id="pct-${ticker}">--%</div>
-                    </div>
-                    <div class="range-container">
-                        <div class="range-track">
-                            <div class="range-diamond" id="diamond-${ticker}" style="left: 50%;"></div>
-                        </div>
-                        <div class="range-labels">
-                            <span id="low-${ticker}">L:--</span>
-                            <span id="high-${ticker}">H:--</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="chart-wrapper">
-                <canvas id="canvas-${ticker}"></canvas>
-            </div>
-        `;
-        
-        addDragEvents(card);
-        dashboard.appendChild(card);
-    }
-
-    async function fetchData() {
-        const timeDisplay = document.getElementById('updateTime');
-        timeDisplay.innerText = '(Updating...)';
-
-        try {
-            // 使用動態判斷的網址
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tickers: watchList })
-            });
-            
-            const data = await response.json();
-            
-            data.forEach(stockData => {
-                updateCard(stockData);
+                `;
+                container.appendChild(card);
             });
 
-            const now = new Date();
-            timeDisplay.innerText = `Updated: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
-
-        } catch (error) {
-            console.error('Fetch error:', error);
-            timeDisplay.innerText = '(Error - Check Network/Render)';
+            // 更新時間顯示
+            document.getElementById('last-updated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
         }
-    }
 
-    function updateCard(data) {
-        const ticker = data.id;
-        const loading = document.getElementById(`loading-${ticker}`);
-        if(loading) loading.classList.add('hidden');
-
-        const isUp = data.change >= 0;
-        const colorClass = isUp ? 'text-up' : 'text-down';
-        const sign = isUp ? '+' : '';
-
-        const priceEl = document.getElementById(`price-${ticker}`);
-        priceEl.innerText = `$${data.price.toFixed(2)}`;
-        priceEl.className = `current-price ${colorClass}`;
-
-        const changeEl = document.getElementById(`change-${ticker}`);
-        changeEl.innerText = `${sign}${data.change.toFixed(2)}`;
-        
-        const pctEl = document.getElementById(`pct-${ticker}`);
-        pctEl.innerText = `${sign}${data.pct.toFixed(2)}%`;
-        
-        const groupEl = changeEl.parentElement;
-        groupEl.className = `change-group ${colorClass}`;
-
-        document.getElementById(`open-${ticker}`).innerText = `Prev: ${data.open}`;
-        document.getElementById(`low-${ticker}`).innerText = `L:${data.low}`;
-        document.getElementById(`high-${ticker}`).innerText = `H:${data.high}`;
-        document.getElementById(`bidask-${ticker}`).innerHTML = `B:<span>${data.futBid}</span> / A:<span>${data.futAsk}</span>`;
-        
-        // 這裡會顯示從後端 NAME_CACHE 傳來的正確全名
-        document.getElementById(`name-${ticker}`).innerText = data.name;
-
-        let rangePct = 50;
-        if(data.high !== data.low) {
-            rangePct = ((data.price - data.low) / (data.high - data.low)) * 100;
-            rangePct = Math.max(0, Math.min(100, rangePct));
-        }
-        document.getElementById(`diamond-${ticker}`).style.left = `calc(${rangePct}% - 3px)`;
-
-        drawChart(ticker, isUp, data.chartLabels, data.chartData, data.dashedData);
-    }
-
-    function drawChart(ticker, isUp, labels, dataPoints, dashedData) {
-        const ctx = document.getElementById(`canvas-${ticker}`).getContext('2d');
-        if (chartInstances[ticker]) chartInstances[ticker].destroy();
-
-        const color = isUp ? '#00d25b' : '#fc424a';
-        const gradient = ctx.createLinearGradient(0, 0, 0, 140);
-        gradient.addColorStop(0, isUp ? 'rgba(0, 210, 91, 0.2)' : 'rgba(252, 66, 74, 0.2)');
-        gradient.addColorStop(1, 'rgba(0,0,0,0)');
-
-        chartInstances[ticker] = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        data: dataPoints, borderColor: color, backgroundColor: gradient,
-                        fill: true, borderWidth: 1.5, pointRadius: 0,
-                        pointHoverRadius: 5, pointBackgroundColor: color, pointBorderColor: '#fff',
-                        tension: 0.1
-                    },
-                    {
-                        data: dashedData, borderColor: '#777', borderWidth: 1,
-                        borderDash: [4, 4], pointRadius: 0, fill: false
-                    }
-                ]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false, animation: false,
-                plugins: {
-                    legend: false,
-                    tooltip: {
-                        mode: 'index', intersect: false,
-                        backgroundColor: 'rgba(60,64,67,0.9)', displayColors: false,
-                        callbacks: {
-                            title: (i) => i[0].label,
-                            label: (c) => c.datasetIndex===0 ? `Price: $${c.raw.toFixed(2)}` : ''
-                        }, filter: (item) => item.datasetIndex === 0
-                    }
-                },
-                scales: {
-                    x: { display: true, grid: { display: false }, ticks: { color: '#777', maxTicksLimit: 4, font:{size:10} } },
-                    y: { display: true, position: 'right', grid: { color: '#333' }, ticks: { color: '#777', font:{size:10} } }
-                }, interaction: { mode: 'index', intersect: false }
+        // 主執行函數
+        async function updateDashboard() {
+            const container = document.getElementById('stock-container');
+            const btn = document.getElementById('refresh-btn');
+            
+            // 按鈕狀態鎖定
+            btn.disabled = true;
+            btn.textContent = 'Loading...';
+            
+            try {
+                const data = await fetchStockData();
+                renderStocks(data);
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="error">
+                        <strong>Error loading data</strong><br>
+                        ${error.message}<br><br>
+                        請確認您的 Google Apps Script 已部署為 "New Version" 且權限為 "Anyone"。
+                    </div>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Refresh';
             }
-        });
-    }
-
-    let dragSrcEl = null;
-    function addDragEvents(card) {
-        card.addEventListener('dragstart', function(e) {
-            dragSrcEl = this;
-            e.dataTransfer.effectAllowed = 'move';
-            this.classList.add('dragging');
-        });
-        card.addEventListener('dragover', function(e) { e.preventDefault(); });
-        card.addEventListener('dragenter', function() { this.style.borderColor = 'var(--accent)'; });
-        card.addEventListener('dragleave', function() { this.style.borderColor = '#333'; });
-        card.addEventListener('drop', function(e) {
-            e.stopPropagation();
-            this.style.borderColor = '#333';
-            if (dragSrcEl !== this) {
-                const dashboard = document.getElementById('dashboard');
-                const allCards = [...dashboard.querySelectorAll('.stock-card')];
-                const srcIndex = allCards.indexOf(dragSrcEl);
-                const targetIndex = allCards.indexOf(this);
-                const item = watchList.splice(srcIndex, 1)[0];
-                watchList.splice(targetIndex, 0, item);
-                initDashboard();
-            }
-            return false;
-        });
-        card.addEventListener('dragend', function() {
-            this.classList.remove('dragging');
-            document.querySelectorAll('.stock-card').forEach(c => c.style.borderColor = '#333');
-        });
-    }
-
-    window.removeStock = function(ticker) {
-        if(confirm(`Remove ${ticker}?`)) {
-            watchList = watchList.filter(t => t !== ticker);
-            initDashboard();
         }
-    };
 
-    window.addStock = function() {
-        const input = document.getElementById('newTicker');
-        let ticker = input.value.toUpperCase().trim();
-        if(!ticker) return;
-        if(/^\d{4}$/.test(ticker)) ticker += '.TW';
-        if(!watchList.includes(ticker)) {
-            watchList.unshift(ticker);
-            initDashboard();
-        }
-        closeModal();
-        input.value = '';
-    };
-
-    window.openModal = () => document.getElementById('addModal').style.display = 'flex';
-    window.closeModal = () => document.getElementById('addModal').style.display = 'none';
-
-    initDashboard();
-    setInterval(fetchData, 60000);
-</script>
-
+        // 網頁開啟時自動執行一次
+        window.onload = updateDashboard;
+    </script>
 </body>
 </html>
-
