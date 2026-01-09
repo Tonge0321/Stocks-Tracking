@@ -5,23 +5,33 @@ import pandas as pd
 import os
 
 app = Flask(__name__)
-# 允許所有來源連線，解決 (Error) 問題的關鍵
 CORS(app)
 
-# 用來暫存公司名稱，避免每次都重新抓取導致速度變慢
+# --- 修正重點：預先定義好公司名稱，解決 yfinance 抓不到或逾時的問題 ---
 NAME_CACHE = {
     '0050.TW': 'Yuanta/P-shares Taiwan Top 50 ETF',
+    'VRT': 'Vertiv Holdings Co',
+    'SOFI': 'SoFi Technologies Inc',
+    'S': 'SentinelOne Inc',
+    'RCAT': 'Red Cat Holdings Inc',
+    'ONDS': 'Ondas Holdings Inc',
+    'NVDA': 'NVIDIA Corp',
+    'SMR': 'NuScale Power Corp',
+    'NKE': 'Nike Inc',
+    'EOSE': 'Eos Energy Enterprises Inc',
+    'CRWV': 'CoreWeave Inc'  # 私有/未上市櫃公司手動定義
 }
 
 def get_stock_name(ticker_symbol):
+    # 1. 優先從 Cache 拿，速度最快且最穩定
     if ticker_symbol in NAME_CACHE:
         return NAME_CACHE[ticker_symbol]
     
+    # 2. 如果 Cache 沒有，才嘗試去網路抓 (作為備案)
     try:
         t = yf.Ticker(ticker_symbol)
-        # 嘗試抓取公司全名
         name = t.info.get('shortName') or t.info.get('longName') or ticker_symbol
-        NAME_CACHE[ticker_symbol] = name
+        NAME_CACHE[ticker_symbol] = name # 抓到後存入 Cache
         return name
     except:
         return ticker_symbol
@@ -45,6 +55,9 @@ def get_stock_data(tickers):
             if len(tickers) == 1:
                 df = hist_data
             else:
+                # 確保 ticker 在 columns 中
+                if ticker not in hist_data.columns.levels[0]:
+                    continue
                 df = hist_data[ticker]
             
             # 清理空值
@@ -57,12 +70,13 @@ def get_stock_data(tickers):
             open_price = df['Open'].iloc[0]
             high_price = df['High'].max()
             low_price = df['Low'].min()
+            # 簡單使用第一筆 Open 當作昨日收盤參考，或使用 yfinance 的 previousClose
             prev_close = open_price 
             
             change = current_price - prev_close
             pct = (change / prev_close) * 100
 
-            # 取得名稱
+            # 取得名稱 (現在會優先讀取我們設定好的 Cache)
             full_name = get_stock_name(ticker)
 
             # 準備走勢圖數據
@@ -70,7 +84,6 @@ def get_stock_data(tickers):
             chart_labels = []
             dashed_data = []
             
-            # 取最後 50 筆數據繪圖
             subset = df.tail(50)
             for index, row in subset.iterrows():
                 chart_data.append(row['Close'])
@@ -111,6 +124,5 @@ def get_stocks():
     return jsonify(data)
 
 if __name__ == '__main__':
-    # 配合 Render 的環境變數設定 Port
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
