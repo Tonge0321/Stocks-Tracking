@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Stock Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-main: #ffffff;
+            --text-sub: #9aa0a6;
+            --text-tertiary: #5f6368;
+            --up-color: #00d25b;
+            --down-color: #fc424a;
+            --accent: #3d7bf8;
+            --danger: #ff4444;
+        }
+
+        body {
+            font-family: 'Google Sans', Roboto, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        h1 { margin: 0; font-size: 1.5rem; font-weight: 400; }
+        .last-update { font-size: 0.8rem; color: var(--text-tertiary); margin-left: 10px; }
+
+        .btn {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn-refresh { background-color: #333; margin-right: 10px; }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 20px;
+        }
+
+        /* Stock Card */
+        .stock-card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            border: 1px solid #333;
+            position: relative;
+            cursor: grab;
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+            min-height: 250px; /* 預留高度避免跳動 */
+        }
+        
+        .stock-card:active { cursor: grabbing; }
+        .stock-card:hover {
+            border-color: #555;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+        }
+        .stock-card.dragging {
+            opacity: 0.5;
+            border: 2px dashed var(--accent);
+            background: #252525;
+        }
+
+        /* Loading State */
+        .loading-overlay {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: rgba(30,30,30,0.8);
+            display: flex; justify-content: center; align-items: center;
+            border-radius: 12px; z-index: 5;
+            color: #aaa; font-size: 0.9rem;
+        }
+        .hidden { display: none; }
+
+        /* Delete Btn */
+        .delete-btn {
+            position: absolute; top: 10px; right: 10px;
+            background: none; border: none; color: #444;
+            font-size: 1.5rem; line-height: 1; cursor: pointer;
+            padding: 0 5px; z-index: 10; transition: color 0.2s;
+        }
+        .delete-btn:hover { color: var(--danger); }
+
+        /* Content Layout */
+        .card-header {
+            display: flex; justify-content: space-between; align-items: baseline; padding-right: 20px;
+        }
+        .ticker { font-size: 1.4rem; font-weight: 500; }
+        .comp-name { font-size: 0.8rem; color: var(--text-sub); margin-left: 8px; }
+        .open-label { font-size: 0.75rem; color: var(--text-sub); }
+
+        .data-row { display: flex; justify-content: space-between; align-items: flex-end; }
+        
+        .left-col { display: flex; flex-direction: column; justify-content: flex-end; }
+        .current-price { font-size: 2.2rem; font-weight: 500; line-height: 1; margin-bottom: 8px; letter-spacing: -1px; }
+        
+        .futures-row { font-size: 0.75rem; color: var(--text-sub); display: flex; gap: 8px; align-items: center; }
+        .fut-tag { background: #3c4043; color: #e8eaed; padding: 2px 4px; border-radius: 4px; font-size: 0.65rem; font-weight: 600; }
+        .bid-ask { font-family: 'Roboto Mono', monospace; color: var(--text-sub); }
+
+        .right-col { display: flex; flex-direction: column; align-items: flex-end; width: 45%; }
+        .change-group { text-align: right; margin-bottom: 8px; }
+        .change-val { font-size: 1.2rem; font-weight: 500; }
+        .change-pct { font-size: 0.9rem; }
+
+        .range-container { width: 50%; margin-left: auto; padding-top: 4px; }
+        .range-track { position: relative; height: 1px; background: #5f6368; width: 100%; margin: 6px 0; }
+        .range-diamond { width: 6px; height: 6px; background: var(--text-main); transform: rotate(45deg); position: absolute; top: -2.5px; box-shadow: 0 0 2px rgba(255,255,255,0.8); transition: left 0.5s ease; }
+        .range-labels { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--text-sub); font-family: 'Roboto Mono', monospace; }
+
+        .chart-wrapper { height: 140px; width: 100%; margin-top: 10px; position: relative; }
+
+        .text-up { color: var(--up-color); }
+        .text-down { color: var(--down-color); }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); display: none;
+            justify-content: center; align-items: center; z-index: 1000;
+        }
+        .modal { background: var(--card-bg); padding: 24px; border-radius: 12px; width: 320px; border: 1px solid #333; }
+        .modal input { width: 100%; padding: 10px; margin: 15px 0; background: #121212; border: 1px solid #333; color: white; border-radius: 4px; box-sizing: border-box; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+        .btn-cancel { background: #333; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div>
+        <h1>My Watchlist <span id="updateTime" class="last-update"></span></h1>
+    </div>
+    <div>
+        <button class="btn btn-refresh" onclick="fetchData()">⟳ Refresh</button>
+        <button class="btn" onclick="openModal()">+ Add Stock</button>
+    </div>
+</header>
+
+<div class="dashboard-grid" id="dashboard">
+    </div>
+
+<div class="modal-overlay" id="addModal">
+    <div class="modal">
+        <h3>Add New Ticker</h3>
+        <input type="text" id="newTicker" placeholder="e.g., AMD, TSLA" style="text-transform: uppercase;">
+        <div class="modal-actions">
+            <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+            <button class="btn" onclick="addStock()">Add</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. 您的追蹤清單 (初始狀態)
+    let watchList = ['0050.TW', 'VRT', 'SOFI', 'S', 'RCAT', 'ONDS', 'NVDA', 'SMR', 'NKE', 'EOSE', 'CRWV']; 
+    // 注意：台股 0050 在 Yahoo Finance 代號為 '0050.TW'
+
+    // 用來儲存 Chart 實例，以便更新時銷毀重建
+    let chartInstances = {};
+
+    Chart.register({
+        id: 'verticalLine',
+        afterDraw: (chart) => {
+            if (chart.tooltip?._active?.length) {
+                const ctx = chart.ctx;
+                const x = chart.tooltip._active[0].element.x;
+                const topY = chart.scales.y.top;
+                const bottomY = chart.scales.y.bottom;
+                ctx.save();
+                ctx.beginPath(); ctx.moveTo(x, topY); ctx.lineTo(x, bottomY);
+                ctx.lineWidth = 1; ctx.strokeStyle = '#888'; ctx.setLineDash([3, 3]);
+                ctx.stroke(); ctx.restore();
+            }
+        }
+    });
+
+    const dashboard = document.getElementById('dashboard');
+
+    // 2. 初始化介面 (先建立空卡片)
+    function initDashboard() {
+        dashboard.innerHTML = '';
+        watchList.forEach((ticker, index) => {
+            createCardSkeleton(ticker, index);
+        });
+        // 介面建立後，開始抓資料
+        fetchData();
+    }
+
+    function createCardSkeleton(ticker, index) {
+        const card = document.createElement('div');
+        card.className = 'stock-card';
+        card.draggable = true;
+        card.id = `card-${ticker}`;
+        card.dataset.ticker = ticker;
+        card.dataset.index = index;
+
+        card.innerHTML = `
+            <div class="loading-overlay" id="loading-${ticker}">Loading...</div>
+            <button class="delete-btn" onclick="removeStock('${ticker}')">&times;</button>
+            
+            <div class="card-header">
+                <div>
+                    <span class="ticker">${ticker.replace('.TW', '')}</span>
+                    <span class="comp-name" id="name-${ticker}">...</span>
+                </div>
+                <span class="open-label" id="open-${ticker}">Prev: --</span>
+            </div>
+
+            <div class="data-row">
+                <div class="left-col">
+                    <div class="current-price" id="price-${ticker}">--</div>
+                    <div class="futures-row">
+                        <span class="fut-tag">FUT</span>
+                        <div class="bid-ask" id="bidask-${ticker}">B:-- / A:--</div>
+                    </div>
+                </div>
+
+                <div class="right-col">
+                    <div class="change-group">
+                        <div class="change-val" id="change-${ticker}">--</div>
+                        <div class="change-pct" id="pct-${ticker}">--%</div>
+                    </div>
+                    <div class="range-container">
+                        <div class="range-track">
+                            <div class="range-diamond" id="diamond-${ticker}" style="left: 50%;"></div>
+                        </div>
+                        <div class="range-labels">
+                            <span id="low-${ticker}">L:--</span>
+                            <span id="high-${ticker}">H:--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-wrapper">
+                <canvas id="canvas-${ticker}"></canvas>
+            </div>
+        `;
+        
+        addDragEvents(card);
+        dashboard.appendChild(card);
+    }
+
+    // 3. 從後端抓取真實數據
+    async function fetchData() {
+        const timeDisplay = document.getElementById('updateTime');
+        timeDisplay.innerText = '(Updating...)';
+
+        try {
+            const response = await fetch('http://localhost:5000/api/stocks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tickers: watchList })
+            });
+            
+            const data = await response.json();
+            
+            // 更新 UI
+            data.forEach(stockData => {
+                updateCard(stockData);
+            });
+
+            const now = new Date();
+            timeDisplay.innerText = `Updated: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+
+        } catch (error) {
+            console.error('Fetch error:', error);
+            timeDisplay.innerText = '(Connection Failed - Check Python Server)';
+        }
+    }
+
+    function updateCard(data) {
+        const ticker = data.id; // API 傳回的 ID
+        // 對應 HTML 元素
+        const loading = document.getElementById(`loading-${ticker}`);
+        if(loading) loading.classList.add('hidden');
+
+        const isUp = data.change >= 0;
+        const colorClass = isUp ? 'text-up' : 'text-down';
+        const sign = isUp ? '+' : '';
+
+        // 更新文字
+        const priceEl = document.getElementById(`price-${ticker}`);
+        priceEl.innerText = `$${data.price.toFixed(2)}`;
+        priceEl.className = `current-price ${colorClass}`;
+
+        const changeEl = document.getElementById(`change-${ticker}`);
+        changeEl.innerText = `${sign}${data.change.toFixed(2)}`;
+        
+        const pctEl = document.getElementById(`pct-${ticker}`);
+        pctEl.innerText = `${sign}${data.pct.toFixed(2)}%`;
+        
+        const groupEl = changeEl.parentElement;
+        groupEl.className = `change-group ${colorClass}`;
+
+        document.getElementById(`open-${ticker}`).innerText = `Open: ${data.open}`;
+        document.getElementById(`low-${ticker}`).innerText = `L:${data.low}`;
+        document.getElementById(`high-${ticker}`).innerText = `H:${data.high}`;
+        document.getElementById(`bidask-${ticker}`).innerHTML = `B:<span>${data.futBid}</span> / A:<span>${data.futAsk}</span>`;
+        document.getElementById(`name-${ticker}`).innerText = data.name;
+
+        // 更新 Slider
+        let rangePct = 50;
+        if(data.high !== data.low) {
+            rangePct = ((data.price - data.low) / (data.high - data.low)) * 100;
+            rangePct = Math.max(0, Math.min(100, rangePct));
+        }
+        document.getElementById(`diamond-${ticker}`).style.left = `calc(${rangePct}% - 3px)`;
+
+        // 更新圖表
+        drawChart(ticker, isUp, data.chartLabels, data.chartData, data.dashedData);
+    }
+
+    function drawChart(ticker, isUp, labels, dataPoints, dashedData) {
+        const ctx = document.getElementById(`canvas-${ticker}`).getContext('2d');
+        
+        // 如果舊圖表存在，先銷毀
+        if (chartInstances[ticker]) {
+            chartInstances[ticker].destroy();
+        }
+
+        const color = isUp ? '#00d25b' : '#fc424a';
+        const gradient = ctx.createLinearGradient(0, 0, 0, 140);
+        gradient.addColorStop(0, isUp ? 'rgba(0, 210, 91, 0.2)' : 'rgba(252, 66, 74, 0.2)');
+        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+        chartInstances[ticker] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        data: dataPoints,
+                        borderColor: color,
+                        backgroundColor: gradient,
+                        fill: true,
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        pointHoverRadius: 5,
+                        pointBackgroundColor: color,
+                        pointBorderColor: '#fff',
+                        tension: 0.1
+                    },
+                    {
+                        data: dashedData,
+                        borderColor: '#777',
+                        borderWidth: 1,
+                        borderDash: [4, 4],
+                        pointRadius: 0,
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false, // 關閉動畫以提高更新效能
+                plugins: {
+                    legend: false,
+                    tooltip: {
+                        mode: 'index', intersect: false,
+                        backgroundColor: 'rgba(60,64,67,0.9)',
+                        displayColors: false,
+                        callbacks: {
+                            title: (i) => i[0].label,
+                            label: (c) => c.datasetIndex===0 ? `Price: $${c.raw.toFixed(2)}` : ''
+                        }, filter: (item) => item.datasetIndex === 0
+                    }
+                },
+                scales: {
+                    x: { display: true, grid: { display: false }, ticks: { color: '#777', maxTicksLimit: 4, font:{size:10} } },
+                    y: { display: true, position: 'right', grid: { color: '#333' }, ticks: { color: '#777', font:{size:10} } }
+                },
+                interaction: { mode: 'index', intersect: false }
+            }
+        });
+    }
+
+    // --- 拖曳功能 ---
+    let dragSrcEl = null;
+
+    function addDragEvents(card) {
+        card.addEventListener('dragstart', function(e) {
+            dragSrcEl = this;
+            e.dataTransfer.effectAllowed = 'move';
+            this.classList.add('dragging');
+        });
+        card.addEventListener('dragover', function(e) {
+            e.preventDefault();
+        });
+        card.addEventListener('dragenter', function() {
+            this.style.borderColor = 'var(--accent)';
+        });
+        card.addEventListener('dragleave', function() {
+            this.style.borderColor = '#333';
+        });
+        card.addEventListener('drop', function(e) {
+            e.stopPropagation();
+            this.style.borderColor = '#333';
+            if (dragSrcEl !== this) {
+                // 交換 DOM 
+                const dashboard = document.getElementById('dashboard');
+                const allCards = [...dashboard.querySelectorAll('.stock-card')];
+                const srcIndex = allCards.indexOf(dragSrcEl);
+                const targetIndex = allCards.indexOf(this);
+                
+                // 更新 watchList 陣列順序
+                const item = watchList.splice(srcIndex, 1)[0];
+                watchList.splice(targetIndex, 0, item);
+
+                // 重新渲染 (最簡單的方法確保順序正確)
+                initDashboard();
+            }
+            return false;
+        });
+        card.addEventListener('dragend', function() {
+            this.classList.remove('dragging');
+            // 清理樣式
+             document.querySelectorAll('.stock-card').forEach(c => c.style.borderColor = '#333');
+        });
+    }
+
+    // --- 功能邏輯 ---
+    window.removeStock = function(ticker) {
+        if(confirm(`Remove ${ticker}?`)) {
+            watchList = watchList.filter(t => t !== ticker);
+            initDashboard();
+        }
+    };
+
+    window.addStock = function() {
+        const input = document.getElementById('newTicker');
+        let ticker = input.value.toUpperCase().trim();
+        if(!ticker) return;
+        
+        // 簡單處理台股邏輯 (如果輸入 0050 自動加 .TW)
+        if(/^\d{4}$/.test(ticker)) ticker += '.TW';
+
+        if(!watchList.includes(ticker)) {
+            watchList.unshift(ticker);
+            initDashboard();
+        }
+        closeModal();
+        input.value = '';
+    };
+
+    window.openModal = () => document.getElementById('addModal').style.display = 'flex';
+    window.closeModal = () => document.getElementById('addModal').style.display = 'none';
+
+    // 啟動
+    initDashboard();
+    
+    // 自動刷新 (每 60 秒) - 免費 API 不宜過於頻繁
+    setInterval(fetchData, 60000);
+
+</script>
+
+</body>
+</html>
