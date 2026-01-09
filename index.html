@@ -3,202 +3,247 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>美股戰情室 2026</title>
+    <title>Stock Dashboard 2026</title>
     <style>
-        /* --- 基礎設定 --- */
+        /* --- 全局深色主題設定 (還原截圖風格) --- */
         body {
-            background-color: #131722; /* TradingView 深色背景 */
-            color: #d1d4dc;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #0d1117; /* GitHub Dark Dimmed 背景色 */
+            color: #c9d1d9;            /* 柔和白字 */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 20px;
         }
-        
-        /* --- 頂部標題區 --- */
+
+        /* --- 頂部標題與更新時間 --- */
         .header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-end; /* 對齊底部 */
             margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #2a2e39;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #30363d; /* 分隔線 */
         }
-        h1 { margin: 0; font-size: 22px; color: #fff; }
-        .update-info { font-size: 12px; color: #787b86; text-align: right; }
-        
-        /* --- 卡片網格區 --- */
+        h1 { margin: 0; font-size: 24px; color: #f0f6fc; }
+        .last-updated { font-size: 14px; color: #8b949e; }
+
+        /* --- 格狀佈局 (Grid) --- */
         .grid-container {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); /* 自適應寬度 */
+            gap: 20px; /* 卡片間距 */
         }
-        
-        /* --- 單一股票卡片 --- */
-        .stock-card {
-            background-color: #1e222d;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            border: 1px solid #2a2e39;
-            transition: transform 0.2s;
-        }
-        .stock-card:hover { transform: translateY(-3px); border-color: #2962ff; }
 
-        /* 卡片上半部：自製數據 (從 Python/Sheet 來的) */
-        .card-data {
-            padding: 15px;
-            border-bottom: 1px solid #2a2e39;
-        }
-        .symbol-row {
+        /* --- 股票卡片樣式 --- */
+        .stock-card {
+            background-color: #161b22; /* 卡片深灰底色 */
+            border: 1px solid #30363d; /* 邊框 */
+            border-radius: 6px;        /* 圓角 */
+            padding: 16px;
             display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            margin-bottom: 5px;
+            flex-direction: column;
+            transition: transform 0.2s, border-color 0.2s;
         }
-        .symbol { font-size: 18px; font-weight: bold; color: #fff; }
-        .name { font-size: 12px; color: #787b86; } /* 公司名由 Widget 提供，這裡備用 */
-        
-        .price-row {
+        .stock-card:hover {
+            border-color: #58a6ff; /* 滑鼠移過變藍框 */
+            transform: translateY(-2px);
+        }
+
+        /* --- 卡片內部排版 --- */
+        .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 8px;
         }
-        .main-price { font-size: 28px; font-weight: bold; color: #fff; }
+        .symbol {
+            font-size: 20px;
+            font-weight: 600;
+            color: #58a6ff; /* 股票代碼藍色 */
+        }
         
+        /* 漲跌幅標籤 (還原截圖中的圓角矩形) */
         .change-badge {
             padding: 2px 8px;
-            border-radius: 4px;
+            border-radius: 12px;
             font-size: 14px;
             font-weight: 600;
         }
-        .up { color: #089981; background: rgba(8, 153, 129, 0.12); }
-        .down { color: #f23645; background: rgba(242, 54, 69, 0.12); }
+        .up { color: #3fb950; background-color: rgba(63, 185, 80, 0.15); border: 1px solid rgba(63, 185, 80, 0.4); }   /* 綠漲 */
+        .down { color: #f85149; background-color: rgba(248, 81, 73, 0.15); border: 1px solid rgba(248, 81, 73, 0.4); } /* 紅跌 */
+        .neutral { color: #8b949e; background-color: rgba(110, 118, 129, 0.15); }
 
-        .futures-info {
-            margin-top: 8px;
-            font-size: 12px;
-            color: #787b86;
+        /* 主價格 */
+        .main-price {
+            font-size: 32px;
+            font-weight: 700;
+            color: #f0f6fc;
+            margin-bottom: 15px;
+            letter-spacing: 0.5px;
+        }
+
+        /* 詳細資訊區 (最高、最低、期貨) */
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            padding-top: 12px;
+            border-top: 1px solid #30363d;
+            font-size: 13px;
+            color: #8b949e;
+        }
+        .detail-item {
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
         }
-        .futures-val { color: #d1d4dc; font-family: monospace; }
+        .detail-label { font-size: 12px; margin-bottom: 2px; }
+        .detail-value { color: #c9d1d9; font-family: monospace; font-size: 14px; }
 
-        /* 卡片下半部：TradingView 走勢圖容器 */
-        .chart-container {
-            height: 180px; /* 圖表高度 */
-            width: 100%;
+        /* --- 圖表容器 --- */
+        .chart-box {
+            height: 150px;
+            margin-top: 15px;
+            border-radius: 4px;
+            overflow: hidden; /* 防止圖表溢出圓角 */
         }
 
-        /* --- 按鈕與狀態 --- */
-        .status-msg { text-align: center; color: #787b86; margin-top: 50px; }
-        .refresh-btn {
-            background: #2962ff; color: white; border: none; padding: 8px 16px;
-            border-radius: 4px; cursor: pointer; font-weight: 600;
+        /* 錯誤與載入訊息 */
+        .status-msg { grid-column: 1/-1; text-align: center; color: #8b949e; margin-top: 50px; }
+        
+        /* 重新整理按鈕 */
+        #refresh-btn {
+            background-color: #238636;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
         }
-        .refresh-btn:hover { background: #1e53e5; }
+        #refresh-btn:hover { background-color: #2ea043; }
     </style>
 </head>
 <body>
 
     <div class="header">
         <div>
-            <h1>戰情室 Dashboard</h1>
-            <div id="last-update" class="update-info">等待數據...</div>
+            <h1>Market Watch</h1>
+            <div id="last-updated" class="last-updated">Initializing...</div>
         </div>
-        <button class="refresh-btn" onclick="loadData()">重新整理</button>
+        <button id="refresh-btn" onclick="initDashboard()">Refresh</button>
     </div>
 
-    <div id="dashboard" class="grid-container">
-        <div class="status-msg">正在從 Google Sheet 載入數據...</div>
+    <div id="container" class="grid-container">
+        <div class="status-msg">Loading data...</div>
     </div>
 
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
 
     <script>
-        // ★★★ 這裡換成您的 Apps Script 網址 ★★★
+        // ★★★ 您的 Apps Script 網址 (請確認結尾是 /exec) ★★★
         const API_URL = "https://script.google.com/macros/s/AKfycbwbZ-6VDAPGy6j3GOV64WAdgR5JSPZaYpXqoDr7Y5iLCoCOUYF10RNtywY52gntnsWp/exec";
 
-        async function loadData() {
-            const container = document.getElementById('dashboard');
-            const timeLabel = document.getElementById('last-update');
+        async function initDashboard() {
+            const container = document.getElementById('container');
+            const timeLabel = document.getElementById('last-updated');
+            const btn = document.getElementById('refresh-btn');
             
+            btn.textContent = 'Loading...';
+            btn.disabled = true;
+
             try {
-                // 1. 從 Google Sheet 抓資料
+                // 加 timestamp 防止快取
                 const res = await fetch(`${API_URL}?t=${Date.now()}`);
                 const data = await res.json();
                 
                 if (!data || data.length === 0) {
-                    container.innerHTML = '<div class="status-msg">無法讀取數據 (Sheet Empty)</div>';
+                    container.innerHTML = '<div class="status-msg">No Data Received from Sheet</div>';
                     return;
                 }
 
-                container.innerHTML = ''; // 清空畫面
+                container.innerHTML = ''; // 清空載入訊息
 
-                // 2. 為每一支股票產生卡片
-                data.forEach((stock, index) => {
-                    // 跳過測試或錯誤資料
-                    if(stock.symbol === "SYSTEM_OK" || stock.symbol === "TEST") return;
+                data.forEach((stock, idx) => {
+                    // 過濾掉系統測試用的資料
+                    if (stock.symbol === 'SYSTEM_OK' || stock.symbol === 'TEST') return;
 
-                    // 判斷漲跌顏色
-                    let changePct = stock.changePercent || "0%";
-                    let colorClass = changePct.includes('-') ? 'down' : 'up';
-                    let displayChange = changePct.replace('-', ''); // 去掉負號因為顏色已經代表了
-                    if(colorClass === 'down') displayChange = '-' + displayChange;
-                    else if(displayChange !== "0%") displayChange = '+' + displayChange;
+                    // 處理漲跌顏色邏輯
+                    let pctText = stock.changePercent || "0%";
+                    let type = 'neutral';
+                    if (pctText.includes('-')) type = 'down';
+                    else if (pctText !== "0%" && pctText !== "0.00%") {
+                        type = 'up';
+                        if (!pctText.includes('+')) pctText = '+' + pctText; // 補上正號
+                    }
 
-                    // 建立卡片 HTML
+                    // 建立卡片元素
                     const card = document.createElement('div');
                     card.className = 'stock-card';
-                    
-                    // 隨機生成一個 ID 給圖表用
-                    const chartId = `chart_${stock.symbol}_${index}`;
+                    const chartId = `chart_${idx}`; // 獨立圖表 ID
 
                     card.innerHTML = `
-                        <div class="card-data">
-                            <div class="symbol-row">
-                                <span class="symbol">${stock.symbol}</span>
-                                <span class="change-badge ${colorClass}">${displayChange}</span>
+                        <div class="card-header">
+                            <span class="symbol">${stock.symbol}</span>
+                            <span class="change-badge ${type}">${pctText}</span>
+                        </div>
+                        
+                        <div class="main-price">${stock.price}</div>
+                        
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">Day High</span>
+                                <span class="detail-value">${stock.high || '-'}</span>
                             </div>
-                            <div class="price-row">
-                                <span class="main-price">${stock.price}</span>
+                            <div class="detail-item">
+                                <span class="detail-label">Day Low</span>
+                                <span class="detail-value">${stock.low || '-'}</span>
                             </div>
-                            <div class="futures-info">
-                                <span>盤後/期貨</span>
-                                <span class="futures-val">${stock.futuresPrice}</span>
+                            <div class="detail-item">
+                                <span class="detail-label">Futures / AH</span>
+                                <span class="detail-value">${stock.futuresPrice || '-'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Updated</span>
+                                <span class="detail-value">${stock.timestamp}</span>
                             </div>
                         </div>
-                        <div id="${chartId}" class="chart-container"></div>
+
+                        <div id="${chartId}" class="chart-box"></div>
                     `;
-                    
                     container.appendChild(card);
 
-                    // 3. 嵌入 TradingView 小圖表 (Mini Chart)
+                    // 嵌入 TradingView 小圖表 (Mini Chart)
                     new TradingView.widget({
                         "autosize": true,
-                        "symbol": stock.symbol, // 自動對應股票代碼
+                        "symbol": stock.symbol,
                         "interval": "D",
                         "timezone": "Asia/Taipei",
                         "theme": "dark",
-                        "style": "1", // 1=K線圖, 3=面積圖
-                        "locale": "zh_TW",
+                        "style": "3", // 3 = 面積圖 (Area), 比較像截圖的風格
+                        "locale": "en",
                         "toolbar_bg": "#f1f3f6",
                         "enable_publishing": false,
                         "hide_top_toolbar": true,
                         "hide_legend": true,
                         "save_image": false,
-                        "container_id": chartId
+                        "container_id": chartId,
+                        "isTransparent": true // 讓圖表背景透明，融入卡片色
                     });
                 });
-
-                timeLabel.textContent = `最後更新: ${new Date().toLocaleTimeString()}`;
+                
+                timeLabel.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
 
             } catch (err) {
                 console.error(err);
-                container.innerHTML = `<div class="status-msg" style="color:#f23645">連線錯誤: ${err.message}</div>`;
+                container.innerHTML = `<div class="status-msg" style="color: #f85149;">Connection Error: ${err.message}</div>`;
+            } finally {
+                btn.textContent = 'Refresh';
+                btn.disabled = false;
             }
         }
 
-        window.onload = loadData;
+        // 頁面載入後自動執行
+        window.onload = initDashboard;
     </script>
 </body>
 </html>
