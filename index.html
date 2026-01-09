@@ -100,51 +100,47 @@
         }
         .delete-btn:hover { color: var(--danger); }
 
-        /* --- Header Layout Change Starts Here --- */
+        /* Header Layout: Ticker + Name */
         .card-header {
             display: flex; 
             justify-content: space-between; 
-            align-items: center; /* 垂直置中 */
+            align-items: center; 
             padding-right: 20px;
         }
 
-        /* 新增一個群組包住 Ticker 和 Name */
         .ticker-name-group {
             display: flex;
             align-items: center;
-            flex: 1; /* 佔據剩餘空間 */
-            min-width: 0; /* 允許內容收縮，關鍵設定 */
-            padding-right: 10px; /* 與右邊價格保持距離 */
+            flex: 1; 
+            min-width: 0; 
+            padding-right: 10px;
         }
 
         .ticker { 
             font-size: 1.4rem; 
             font-weight: 500; 
-            flex-shrink: 0; /* 代號不縮小 */
+            flex-shrink: 0;
         }
 
         .comp-name { 
-            font-size: 0.75rem; /* 字體縮小 */
+            font-size: 0.75rem; 
             color: var(--text-sub); 
             margin-left: 8px; 
-            
-            /* 雙排換行與截斷設定 */
             display: -webkit-box;
-            -webkit-line-clamp: 2; /* 最多顯示兩行 */
+            -webkit-line-clamp: 2; 
             -webkit-box-orient: vertical;
             overflow: hidden;
-            white-space: normal; /* 允許換行 */
-            line-height: 1.1; /* 行距緊湊 */
+            white-space: normal; 
+            line-height: 1.1;
         }
 
         .open-label { 
             font-size: 0.75rem; 
             color: var(--text-sub);
-            flex-shrink: 0; /* 價格標籤絕對不縮小，防止被蓋住 */
-            white-space: nowrap; /* 不換行 */
+            flex-shrink: 0; 
+            white-space: nowrap; 
             text-align: right;
         }
-        /* --- Header Layout Change Ends Here --- */
 
         .data-row { display: flex; justify-content: space-between; align-items: flex-end; }
         
@@ -296,8 +292,8 @@
         timeDisplay.innerText = '(Updating...)';
 
         try {
-            // 請確保這裡填入的是您 Render 的網址
-            const response = await fetch('https://stocks-tracking.onrender.com', {
+            // ✅ 這裡我已經幫您填入正確的 Render 網址了
+            const response = await fetch('https://stocks-tracking.onrender.com/api/stocks', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ tickers: watchList })
@@ -314,7 +310,7 @@
 
         } catch (error) {
             console.error('Fetch error:', error);
-            timeDisplay.innerText = '(Error)';
+            timeDisplay.innerText = '(Error - Check Render Status)';
         }
     }
 
@@ -345,7 +341,6 @@
         document.getElementById(`high-${ticker}`).innerText = `H:${data.high}`;
         document.getElementById(`bidask-${ticker}`).innerHTML = `B:<span>${data.futBid}</span> / A:<span>${data.futAsk}</span>`;
         
-        // 更新名稱：如果是太長的名字，CSS 會自動處理
         document.getElementById(`name-${ticker}`).innerText = data.name;
 
         let rangePct = 50;
@@ -464,4 +459,3 @@
 
 </body>
 </html>
-
