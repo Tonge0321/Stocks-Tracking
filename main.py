@@ -37,7 +37,7 @@ def run_full_update():
                 "timestamp": "1/9 Close"
             })
             
-    print(f"準備發送 {len(payload)} 筆股票資料...")
+    print(f"準備發送 {len(payload)} 筆股票資料至 Google Sheet...")
     
     try:
         headers = {'Content-Type': 'application/json'}
@@ -49,11 +49,10 @@ def run_full_update():
         if "Success" in response.text or "Updated" in response.text:
             print("\n✅ 更新成功！")
         else:
-            print("\n❌ 更新失敗，請檢查錯誤訊息。")
+            print("\n❌ 更新失敗")
             
     except Exception as e:
         print(f"\n❌ 連線發生錯誤: {e}")
 
 if __name__ == "__main__":
     run_full_update()
-
