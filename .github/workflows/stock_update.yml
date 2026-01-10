@@ -23,5 +23,8 @@ jobs:
         pip install --upgrade pip
         pip install requests yfinance
         
+    - name: Debug - List installed packages  # 新增這一步
+      run: pip list
+        
     - name: Run script
       run: python main.py
