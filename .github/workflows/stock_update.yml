@@ -1,9 +1,9 @@
 name: Stock Update
 
 on:
-  workflow_dispatch:      # 允許手動執行
+  workflow_dispatch:
   schedule:
-    - cron: '*/20 * * * *' # 每20分鐘執行
+    - cron: '*/20 * * * *'
 
 jobs:
   build:
@@ -18,13 +18,13 @@ jobs:
       with:
         python-version: '3.9'
         
-    - name: Install libraries
+    - name: Create Virtual Env & Install & Run
       run: |
+        python -m venv venv
+        source venv/bin/activate
         pip install --upgrade pip
         pip install requests yfinance
-        
-    - name: Debug - List installed packages  # 新增這一步
-      run: pip list
-        
-    - name: Run script
-      run: python main.py
+        echo "Installed packages:"
+        pip list
+        echo "Running script..."
+        python main.py
